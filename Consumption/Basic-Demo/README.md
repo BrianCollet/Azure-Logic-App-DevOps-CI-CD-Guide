@@ -1,15 +1,23 @@
-# Logic App Consumption CICD with Azure DevOps
+# Azure Logic Apps Consumption – CI/CD with Azure DevOps
 
 This repository demonstrates a CI/CD pipeline for deploying a Logic App Consumption workflow using Azure DevOps. It includes ARM templates, parameter files, and a YAML pipeline definition to automate the deployment process.
 
+## Getting Started
+
+1. **Set Up Azure DevOps**: Configure your Azure DevOps project and service connections.
+2. **Define Variables**: Update environment-specific variables in the parameter files.
+3. **Run the Pipeline**: Trigger the `deploy.yml` pipeline to provision resources and deploy the Logic App.
+
 ## Repository Structure
 
-- **logicapp.template.json**: ARM template for deploying the Logic App, including connections and workflow definitions.
-- **logicapp.parameters.json**: Parameter file for the Logic App ARM template, specifying deployment-specific values like location, Logic App name, and storage account name.
-- **rbac.template.json**: ARM template for assigning RBAC roles to the Logic App's managed identity.
-- **rbac.parameters.json**: Parameter file for the RBAC ARM template, specifying the role definition ID and principal ID.
-- **pipelines/deploy.yml**: Azure DevOps pipeline definition for validating and deploying the ARM templates.
-- **README.md**: Documentation for the repository.
+```
+├── 📄 logicapp.template.json # ARM template for deploying the Logic App, including connections and workflow definitions.
+├── 📄 logicapp.parameters.json # Parameter file for the Logic App ARM template, specifying deployment-specific values like location, Logic App name, and storage account name.
+├── 📄 rbac.template.json # ARM template for assigning RBAC roles to the Logic App's managed identity.
+├── 📄 rbac.parameters.json # Parameter file for the RBAC ARM template, specifying the role definition ID and principal ID.
+└── 📁 pipelines/
+│   └── 📄 deploy.yml # Azure DevOps pipeline definition for validating and deploying the ARM templates.
+```
 
 ## Deployment Workflow
 
@@ -32,12 +40,6 @@ The pipeline accepts the following parameters:
 - `logicAppName`: Name of the Logic App to deploy.
 - `storageAccountName`: Name of the storage account used in the Logic App.
 - `roleDefinitionID`: ID of the RBAC role to assign to the Logic App's managed identity.
-
-## How to Use
-
-1. Update the parameter files (`logicapp.parameters.json` and `rbac.parameters.json`) with your deployment-specific values.
-2. Configure the Azure DevOps pipeline using `pipelines/deploy.yml`.
-3. Run the pipeline to deploy the Logic App and assign RBAC roles.
 
 ## Outputs
 
