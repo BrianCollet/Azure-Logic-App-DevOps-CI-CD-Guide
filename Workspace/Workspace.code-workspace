@@ -1,0 +1,11 @@
+{
+  "folders": [
+    {
+      "name": "logicapp",
+      "path": "./logicapp"
+    },
+    {
+      "path": "deployment"
+    }
+  ]
+}

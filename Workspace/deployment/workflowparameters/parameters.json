@@ -1,0 +1,16 @@
+{
+  "azureblob-1-ConnectionRuntimeUrl": {
+    "type": "String",
+    "value": "@appsetting('azureblob-1-ConnectionRuntimeUrl')"
+  },
+  "azureblob-1-Authentication": {
+    "type": "Object",
+    "value": {
+      "type": "ManagedServiceIdentity"
+    }
+  },
+  "azureblob-ConnectionRuntimeUrl": {
+    "type": "String",
+    "value": "@appsetting('azureblob-ConnectionRuntimeUrl')"
+  }
+}

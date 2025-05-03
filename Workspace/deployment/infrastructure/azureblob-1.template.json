@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "String"
+    },
+    "objectId": {
+      "type": "String"
+    },
+    "tenantId": {
+      "type": "String"
+    },
+    "targetStorageAccountResourceGroupName": {
+      "type": "String"
+    },
+    "targetStorageAccountName": {
+      "type": "String"
+    },
+    "connectionName": {
+      "type": "String"
+    },
+    "connectionDisplayName": {
+      "type": "String"
+    },
+    "connectionAccessPolicySuffixName": {
+      "type": "String",
+      "defaultValue": "[newGuid()]"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('connectionName')]",
+      "location": "[parameters('location')]",
+      "kind": "V2",
+      "type": "Microsoft.Web/connections",
+      "resources": [
+        {
+          "apiVersion": "2016-06-01",
+          "name": "[concat(parameters('connectionName'),'-',parameters('connectionAccessPolicySuffixName'))]",
+          "location": "[parameters('location')]",
+          "type": "accessPolicies",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/connections', parameters('connectionName'))]"
+          ],
+          "properties": {
+            "principal": {
+              "type": "ActiveDirectory",
+              "identity": {
+                "objectId": "[parameters('objectId')]",
+                "tenantId": "[parameters('tenantId')]"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "displayName": "[parameters('connectionDisplayName')]",
+        "api": {
+          "id": "[concat('/subscriptions/',subscription().subscriptionId,'/providers/Microsoft.Web/locations/',parameters('location'),'/managedApis/azureblob')]"
+        },
+        "parameterValueSet": {
+          "name": "keyBasedAuth",
+          "values": {
+            "accountName": {
+              "value": "[parameters('targetStorageAccountName')]"
+            },
+            "accessKey": {
+              "value": "[listKeys(resourceId(parameters('targetStorageAccountResourceGroupName'),'Microsoft.Storage/storageAccounts', parameters('targetStorageAccountName')), '2019-04-01').keys[0].value]"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "azureblob1ConnectionRuntimeUrl": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/connections', parameters('connectionName')),'2016-06-01', 'full').properties.connectionRuntimeUrl]"
+    }
+  }
+}

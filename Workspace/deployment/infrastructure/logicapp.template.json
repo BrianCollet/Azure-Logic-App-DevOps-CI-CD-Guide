@@ -1,0 +1,223 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appServicePlanName": {
+      "type": "string"
+    },
+    "applicationInsightsName": {
+      "type": "string"
+    },
+    "backendFileShareName": {
+      "type": "string"
+    },
+    "backendStorageAccountName": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "logAnalyticsWorkspaceName": {
+      "type": "string"
+    },
+    "logicAppName": {
+      "type": "string"
+    },
+    "numberOfWorkers": {
+      "type": "string"
+    },
+    "skuCode": {
+      "type": "string",
+      "defaultValue": "WS1"
+    },
+    "subscriptionId": {
+      "type": "string"
+    },
+    "targetStorageAccountName": {
+      "type": "string"
+    },
+    "targetStorageAccountResourceGroupName": {
+      "type": "string"
+    },
+    "workerSize": {
+      "type": "string"
+    },
+    "workerSizeId": {
+      "type": "string"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('logicAppName')]",
+      "type": "Microsoft.Web/sites",
+      "kind": "functionapp,workflowapp",
+      "location": "[parameters('location')]",
+      "tags": {
+        "hidden-link: /app-insights-resource-id": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Insights/components/', parameters('applicationInsightsName'))]",
+        "[concat('Microsoft.Web/serverfarms/', parameters('appServicePlanName'))]",
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('backendStorageAccountName'))]"
+      ],
+      "properties": {
+        "name": "[parameters('logicAppName')]",
+        "siteConfig": {
+          "appSettings": [
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~4"
+            },
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "dotnet"
+            },
+            {
+              "name": "WEBSITE_NODE_DEFAULT_VERSION",
+              "value": "~20"
+            },
+            {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "[reference(concat('Microsoft.Insights/components/', parameters('applicationInsightsName')), '2015-05-01').InstrumentationKey]"
+            },
+            {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "[reference(concat('Microsoft.Insights/components/', parameters('applicationInsightsName')), '2015-05-01').ConnectionString]"
+            },
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',parameters('backendStorageAccountName'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('backendStorageAccountName')), '2019-06-01').keys[0].value,';EndpointSuffix=','core.windows.net')]"
+            },
+            {
+              "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',parameters('backendStorageAccountName'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('backendStorageAccountName')), '2019-06-01').keys[0].value,';EndpointSuffix=','core.windows.net')]"
+            },
+            {
+              "name": "WEBSITE_CONTENTSHARE",
+              "value": "[toLower(parameters('backendFileShareName'))]"
+            },
+            {
+              "name": "AzureFunctionsJobHost__extensionBundle__id",
+              "value": "Microsoft.Azure.Functions.ExtensionBundle.Workflows"
+            },
+            {
+              "name": "AzureFunctionsJobHost__extensionBundle__version",
+              "value": "[1.*, 2.0.0)"
+            },
+            {
+              "name": "APP_KIND",
+              "value": "workflowApp"
+            },
+            {
+              "name": "FUNCTIONS_INPROC_NET8_ENABLED",
+              "value": "1"
+            },
+            {
+              "name": "WORKFLOWS_SUBSCRIPTION_ID",
+              "value": "[parameters('subscriptionId')]"
+            },
+            {
+              "name": "WORKFLOWS_LOCATION_NAME",
+              "value": "[parameters('location')]"
+            },
+            {
+              "name": "WORKFLOWS_RESOURCE_GROUP_NAME",
+              "value": "[resourceGroup().name]"
+            },
+            {
+              "name": "AzureBlob_connectionString",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('targetStorageAccountName'), ';AccountKey=', listKeys(resourceId(parameters('targetStorageAccountResourceGroupName'),'Microsoft.Storage/storageAccounts', parameters('targetStorageAccountName')), '2019-04-01').keys[0].value,';EndpointSuffix=core.windows.net')]"
+            },
+            {
+              "name": "AzureBlob_1_blobStorageEndpoint",
+              "value": "[concat('https://', parameters('targetStorageAccountName'), '.blob.core.windows.net')]"
+            }
+          ],
+          "cors": {},
+          "use32BitWorkerProcess": false,
+          "netFrameworkVersion": "v8.0",
+          "ftpsState": "FtpsOnly"
+        },
+        "serverFarmId": "[concat('/subscriptions/', subscription().subscriptionId,'/resourcegroups/', resourceGroup().name, '/providers/Microsoft.Web/serverfarms/', parameters('appServicePlanName'))]",
+        "clientAffinityEnabled": false,
+        "virtualNetworkSubnetId": null,
+        "httpsOnly": true
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      }
+    },
+    {
+      "apiVersion": "2020-12-01",
+      "name": "[parameters('appServicePlanName')]",
+      "type": "Microsoft.Web/serverfarms",
+      "location": "[parameters('location')]",
+      "kind": "elastic",
+      "properties": {
+        "name": "[parameters('appServicePlanName')]",
+        "workerSize": "[parameters('workerSize')]",
+        "workerSizeId": "[parameters('workerSizeId')]",
+        "numberOfWorkers": "[parameters('numberOfWorkers')]",
+        "maximumElasticWorkerCount": 1,
+        "zoneRedundant": false
+      },
+      "sku": {
+        "name": "[parameters('skuCode')]",
+        "tier": "WorkflowStandard"
+      }
+    },
+    {
+      "apiVersion": "2023-09-01",
+      "name": "[parameters('logAnalyticsWorkspaceName')]",
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "apiVersion": "2020-02-02",
+      "name": "[parameters('applicationInsightsName')]",
+      "type": "Microsoft.Insights/components",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.OperationalInsights/workspaces/', parameters('logAnalyticsWorkspaceName'))]"
+      ],
+      "properties": {
+        "ApplicationId": "[parameters('logicAppName')]",
+        "Request_Source": "IbizaWebAppExtensionCreate",
+        "Flow_Type": "Redfield",
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]"
+      }
+    },
+    {
+      "apiVersion": "2019-06-01",
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('backendStorageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2"
+      }
+    }
+  ],
+  "outputs": {
+    "logicAppSystemAssignedIdentityTenantId": {
+      "type": "string",
+      "value": "[subscription().tenantid]"
+    },
+    "logicAppSystemAssignedIdentityPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', parameters('logicAppName')),'2024-04-01', 'full').identity.principalId]"
+    }
+  }
+}

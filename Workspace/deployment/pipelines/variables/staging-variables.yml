@@ -1,0 +1,48 @@
+# stg variables
+
+variables:
+  # Your Azure service connection
+  serviceConnectionName: "MySub"
+
+  # Subscription
+  subscriptionId: "bdd0fda1-2256-473c-88a4-f931cc4cb96c"
+
+  # Logic App deploy environment
+  environment: "staging"
+
+  # Resource Group location
+  location: "westus"
+
+  #  Logic App Resource Group
+  resourceGroupName: "stg-bclascicddemo-rg"
+
+  #  Logic App
+  logicAppName: "stg-bclascicddemo-la"
+
+  # Storage account name
+  backendStorageAccountName: "stgbclascicddemosa"
+
+  backendFIleShareName: "stg-bclascicddemo-la-content"
+
+  # App service plan
+  appServicePlanName: "stg-bclascicddemo-asp"
+  skuCode: "WS1"
+  workerSize: "3"
+  workerSizeId: "3"
+  numberOfWorkers: "1"
+
+  # CI artifacts
+  CIArtifactName: "bclascicddemo_publish_artifact_ci"
+
+  # IAC artifacts
+  infraArtifactName: "bclascicddemo_publish_artifact_iac"
+
+  # Target storage account
+  targetStorageAccountResourceGroupName: "Target"
+  targetStorageAccountName: "briancollettargetsa"
+
+  logAnalyticsWorkspaceName: "stg-bclascicddemo-law"
+
+  applicationInsightsName: "stg-bclascicddemo-ai"
+
+  roleDefinitionID: "ba92f5b4-2d11-453d-a403-e96b0029c9fe"

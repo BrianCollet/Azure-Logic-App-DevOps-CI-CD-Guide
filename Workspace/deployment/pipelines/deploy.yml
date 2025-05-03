@@ -1,0 +1,330 @@
+trigger: none
+
+parameters:
+  - name: environment
+    type: string
+    default: dev
+    values:
+      - dev
+      - staging
+      - prod
+
+variables:
+  - ${{ if eq(parameters.environment, 'dev') }}:
+      - template: "variables/dev-variables.yml"
+
+  - ${{ if eq(parameters.environment, 'staging') }}:
+      - template: "variables/staging-variables.yml"
+
+  - ${{ if eq(parameters.environment, 'prod') }}:
+      - template: "variables/prod-variables.yml"
+
+stages:
+  - stage: Infra
+    displayName: Infrastructure
+    jobs:
+      - job: Debug
+        displayName: "Debug: Print pipeline variables"
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - script: |
+              echo "appServicePlanName: $(appServicePlanName)"
+              echo "backendStorageAccountName: $(backendStorageAccountName)"
+              echo "environment: $(environment)"
+              echo "infraArtifactName: $(infraArtifactName)"
+              echo "location: $(location)"
+              echo "logicAppName: $(logicAppName)"
+              echo "newOrExisting: $(newOrExisting)"
+              echo "numberOfWorkers: $(numberOfWorkers)"
+              echo "resourceGroupName: $(resourceGroupName)"
+              echo "serviceConnectionName: $(serviceConnectionName)"
+              echo "skuCode: $(skuCode)"
+              echo "subscriptionId: $(subscriptionId)"
+              echo "targetStorageAccountName: $(targetStorageAccountName)"
+              echo "targetStorageAccountResourceGroupName: $(targetStorageAccountResourceGroupName)"
+              echo "workerSize: $(workerSize)"
+              echo "workerSizeId: $(workerSizeId)"
+            displayName: "Debug: Print pipeline variables"
+
+      - job: BuildInfra
+        dependsOn: Debug
+        displayName: Build Infrastructure Artifacts
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: CopyFiles@2
+            displayName: "Copy ARM templates"
+            inputs:
+              sourceFolder: "$(System.DefaultWorkingDirectory)/deployment/infrastructure"
+              targetFolder: "$(Build.ArtifactStagingDirectory)"
+          - publish: "$(Build.ArtifactStagingDirectory)"
+            artifact: "$(infraArtifactName)"
+
+      - deployment: deploy_dependencies
+        dependsOn: BuildInfra
+        displayName: Deploy Dependencies
+        pool:
+          vmImage: ubuntu-latest
+        environment: $(environment)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: "$(infraArtifactName)"
+
+                - task: AzureResourceGroupDeployment@2
+                  displayName: "Deploy Storage Account"
+                  inputs:
+                    azureSubscription: "$(serviceConnectionName)"
+                    resourceGroupName: "$(targetStorageAccountResourceGroupName)"
+                    location: "$(location)"
+                    csmFile: "$(Pipeline.Workspace)/$(infraArtifactName)/storageaccount.template.json"
+                    csmParametersFile: "$(Pipeline.Workspace)/$(infraArtifactName)/storageaccount.parameters.json"
+                    overrideParameters: "
+                      -location $(location)
+                      -targetStorageAccountName $(targetStorageAccountName)"
+                    deploymentMode: "Incremental"
+
+      - deployment: deploy_logicapp_resources
+        dependsOn: deploy_dependencies
+        displayName: Deploy Logic App Resources
+        pool:
+          vmImage: ubuntu-latest
+        environment: $(environment)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: "$(infraArtifactName)"
+
+                - task: AzureResourceGroupDeployment@2
+                  displayName: "Deploy Logic App"
+                  inputs:
+                    azureSubscription: "$(serviceConnectionName)"
+                    resourceGroupName: "$(resourceGroupName)"
+                    location: "$(location)"
+                    csmFile: "$(Pipeline.Workspace)/$(infraArtifactName)/logicapp.template.json"
+                    csmParametersFile: "$(Pipeline.Workspace)/$(infraArtifactName)/logicapp.parameters.json"
+                    overrideParameters: "
+                      -applicationInsightsName $(applicationInsightsName)
+                      -appServicePlanName $(appServicePlanName)
+                      -backendStorageAccountName $(backendStorageAccountName)
+                      -backendFileShareName $(backendFileShareName)
+                      -location $(location)
+                      -logAnalyticsWorkspaceName $(logAnalyticsWorkspaceName)
+                      -logicAppName $(logicAppName)
+                      -numberOfWorkers $(numberOfWorkers)
+                      -skuCode $(skuCode)
+                      -subscriptionId $(subscriptionId)
+                      -targetStorageAccountResourceGroupName $(targetStorageAccountResourceGroupName)
+                      -targetStorageAccountName $(targetStorageAccountName)
+                      -workerSize $(workerSize)
+                      -workerSizeId $(workerSizeId)"
+                    deploymentMode: "Incremental"
+                    deploymentOutputs: "LogicAppArmOutputs"
+
+                - task: PowerShell@2
+                  name: "SetLogicAppOutputVariables"
+                  displayName: "Set Logic App Output Variables"
+                  inputs:
+                    targetType: inline
+                    script: |
+                      $armOutputObj = '$(LogicAppArmOutputs)' | ConvertFrom-Json
+                      $armOutputObj.PSObject.Properties | ForEach-Object {
+                        ${keyName} = $_.Name
+                        $value = $_.Value.value
+
+                        # Creates a standard pipeline variable
+                        Write-Output "##vso[task.setvariable variable=${keyName};issecret=false;isOutput=true]$value"
+
+                        # Display keys in pipeline
+                        Write-Output "${keyName}: $value"
+                      }
+                    pwsh: true
+
+                - task: AzureResourceGroupDeployment@2
+                  displayName: "Deploy RBAC ARM Template"
+                  inputs:
+                    ConnectedServiceName: "$(serviceConnectionName)"
+                    resourceGroupName: "$(targetStorageAccountResourceGroupName)"
+                    location: "$(location)"
+                    csmFile: "$(Pipeline.Workspace)/$(infraArtifactName)/rbac.template.json"
+                    csmParametersFile: "$(Pipeline.Workspace)/$(infraArtifactName)/rbac.parameters.json"
+                    overrideParameters: "
+                      -roleDefinitionID $(roleDefinitionID)
+                      -principalId $(SetLogicAppOutputVariables.logicAppSystemAssignedIdentityPrincipalId)
+                      -targetStorageAccountName $(targetStorageAccountName)"
+                    deploymentMode: "Incremental"
+
+      - deployment: deploy_apiconnection_resources
+        dependsOn: deploy_logicapp_resources
+        displayName: Deploy API Connection Resources
+        pool:
+          vmImage: ubuntu-latest
+        environment: $(environment)
+        variables:
+          logicAppPrincipalId: $[ dependencies.deploy_logicapp_resources.outputs['deploy_logicapp_resources.SetLogicAppOutputVariables.logicAppSystemAssignedIdentityPrincipalId'] ]
+          logicAppTenantId: $[ dependencies.deploy_logicapp_resources.outputs['deploy_logicapp_resources.SetLogicAppOutputVariables.logicAppSystemAssignedIdentityTenantId'] ]
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: "$(infraArtifactName)"
+
+                - script: |
+                    echo "Principal ID: $(logicAppPrincipalId)"
+                    echo "Tenant ID: $(logicAppTenantId)"
+                  displayName: "Debug: Show referenced variables"
+
+                - task: AzureResourceGroupDeployment@2
+                  displayName: "Deploy azureblob API Connection"
+                  inputs:
+                    azureSubscription: "$(serviceConnectionName)"
+                    resourceGroupName: "$(resourceGroupName)"
+                    location: "$(location)"
+                    csmFile: "$(Pipeline.Workspace)/$(infraArtifactName)/azureblob.template.json"
+                    csmParametersFile: "$(Pipeline.Workspace)/$(infraArtifactName)/azureblob.parameters.json"
+                    overrideParameters: "
+                      -location $(location)
+                      -objectId $(logicAppPrincipalId)
+                      -tenantId $(logicAppTenantId)"
+                    deploymentMode: "Incremental"
+                    deploymentOutputs: azureblobOutputs
+                  continueOnError: true
+
+                - task: AzureResourceGroupDeployment@2
+                  displayName: "Deploy azureblob-1 API Connection"
+                  inputs:
+                    azureSubscription: "$(serviceConnectionName)"
+                    resourceGroupName: "$(resourceGroupName)"
+                    location: "$(location)"
+                    csmFile: "$(Pipeline.Workspace)/$(infraArtifactName)/azureblob-1.template.json"
+                    csmParametersFile: "$(Pipeline.Workspace)/$(infraArtifactName)/azureblob-1.parameters.json"
+                    overrideParameters: "
+                      -location $(location)
+                      -objectId $(logicAppPrincipalId)
+                      -tenantId $(logicAppTenantId)
+                      -targetStorageAccountResourceGroupName $(targetStorageAccountResourceGroupName)
+                      -targetStorageAccountName $(targetStorageAccountName)"
+                    deploymentMode: "Incremental"
+                    deploymentOutputs: azureblob1Outputs
+                  continueOnError: true
+
+                - task: PowerShell@2
+                  name: "SetAzureBlobOutputVariables"
+                  displayName: "Set azureblob Deployment Output Variables"
+                  inputs:
+                    targetType: inline
+                    script: |
+                      if (-not [string]::IsNullOrWhiteSpace('$(azureblobOutputs)')) {
+                        $armOutputObj = '$(azureblobOutputs)' | ConvertFrom-Json
+                        $armOutputObj.PSObject.Properties | ForEach-Object {
+                          ${keyName} = $_.Name
+                          $value = $_.Value.value
+
+                          # Creates a standard pipeline variable
+                          Write-Output "##vso[task.setvariable variable=${keyName};issecret=false]$value"
+
+                          # Display keys in pipeline
+                          Write-Output "${keyName}: $value"
+                        }
+                      } else {
+                        Write-Output "azureblobOutputs is empty. Skipping variable assignment."
+                      }
+                    pwsh: true
+                  continueOnError: true
+
+                - task: PowerShell@2
+                  name: "SetAzureBlob1OutputVariables"
+                  displayName: "Set azureblob-1 Deployment Output Variables"
+                  inputs:
+                    targetType: inline
+                    script: |
+                      if (-not [string]::IsNullOrWhiteSpace('$(azureblob1Outputs)')) {
+                        $armOutputObj = '$(azureblob1Outputs)' | ConvertFrom-Json
+                        $armOutputObj.PSObject.Properties | ForEach-Object {
+                          ${keyName} = $_.Name
+                          $value = $_.Value.value
+
+                          # Creates a standard pipeline variable
+                          Write-Output "##vso[task.setvariable variable=${keyName};issecret=false]$value"
+
+                          # Display keys in pipeline
+                          Write-Output "${keyName}: $value"
+                        }
+                      } else {
+                        Write-Output "azureblob1Outputs is empty. Skipping variable assignment."
+                      }
+                    pwsh: true
+                  continueOnError: true
+
+                - task: AzureAppServiceSettings@1
+                  displayName: "Update Logic App settings"
+                  inputs:
+                    azureSubscription: "$(serviceConnectionName)"
+                    appName: "$(logicAppName)"
+                    resourceGroupName: "$(resourceGroupName)"
+                    appSettings: |
+                      [
+                        {
+                          "name": "azureblob-ConnectionRuntimeUrl",
+                          "value": "$(azureblobConnectionRuntimeUrl)",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "azureblob-1-ConnectionRuntimeUrl",
+                          "value": "$(azureblob1ConnectionRuntimeUrl)", 
+                          "slotSetting": false
+                        }
+                      ]
+
+  - stage: CI
+    displayName: CI
+    dependsOn: Infra
+    jobs:
+      - job: LogicAppBuild
+        displayName: Build and Publish Logic App Code
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: AzureLogicAppsStandardBuild@0
+            displayName: "Build Logic App Code"
+            inputs:
+              sourceFolder: "$(Build.SourcesDirectory)/logicapp"
+              deploymentFolder: "$(System.DefaultWorkingDirectory)/deployment/"
+              archiveFile: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip"
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish Logic App Artifact"
+            inputs:
+              targetPath: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip"
+              artifact: "$(CIArtifactName)"
+              publishLocation: "pipeline"
+
+  - stage: CD
+    displayName: CD
+    dependsOn: [Infra, CI]
+    jobs:
+      - deployment: deploy_logicapp_code
+        displayName: "Deploy Logic App Code"
+        environment: $(environment)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: "$(CIArtifactName)"
+
+                - task: AzureLogicAppsStandardRelease@0
+                  displayName: "Deploy Logic App Package"
+                  inputs:
+                    connectedServiceName: "$(serviceConnectionName)"
+                    appName: "$(logicAppName)"
+                    resourceGroupName: "$(resourceGroupName)"
+                    appSettings: |
+                      []
+                    package: "$(Pipeline.Workspace)/$(CIArtifactName)/$(Build.BuildId).zip"
