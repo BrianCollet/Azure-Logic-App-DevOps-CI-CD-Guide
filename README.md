@@ -25,15 +25,6 @@ I recommend starting with the [Basic-Demo in Standard](./Standard/Basic-Demo/REA
 📁 Consumption/ # Contains examples for Azure Logic Apps (Consumption)
 ├── 📁 Basic-Demo/ # Basic example for Consumption Logic Apps
 │   └── 📄 README.md # Documentation for the Basic-Demo
-
-📁 Shared/ # Shared resources and templates
-├── 📁 deployment/ # Contains ARM templates, parameter files, and pipeline definitions
-│   ├── 📄 logicapp.template.json # ARM template for deploying Logic Apps
-│   ├── 📄 rbac.template.json # ARM template for assigning RBAC roles
-│   └── 📁 pipelines/ # Azure DevOps pipeline definitions
-│       └── 📄 deploy.yml # CI/CD pipeline for deploying Logic Apps
-
-📄 README.md # Documentation for the repository
 ```
 
 ## Key Features
