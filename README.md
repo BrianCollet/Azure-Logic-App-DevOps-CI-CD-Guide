@@ -9,6 +9,10 @@ This repository demonstrates best practices for implementing CI/CD pipelines to 
 3. **Define Variables**: Update environment-specific variables in the parameter files.
 4. **Run the Pipeline**: Trigger the appropriate pipeline to provision resources and deploy the Logic App.
 
+## Don't Know Where to Start?
+
+I recommend starting with the [Basic-Demo in Standard](./Standard/Basic-Demo/README.md). This example provides a simple and clear introduction to deploying Azure Logic Apps (Standard) using CI/CD pipelines.
+
 ## Repository Structure
 
 ```
