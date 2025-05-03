@@ -1,0 +1,222 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "defaultValue": "[resourceGroup().location]",
+      "type": "String"
+    },
+    "logicAppName": {
+      "type": "String"
+    },
+    "storageAccountName": {
+      "type": "String"
+    },
+    "containerName": {
+      "type": "String"
+    },
+    "blobManagedIdentityConnectionName": {
+      "defaultValue": "azureblob",
+      "type": "String"
+    },
+    "blobAccessKeyConnectionName": {
+      "defaultValue": "azureblob-1",
+      "type": "String"
+    },
+    "blobEntraConnectionName": {
+      "defaultValue": "azureblob-2",
+      "type": "String"
+    }
+  },
+  "variables": {
+    "blobApiId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', parameters('location'), '/managedApis/azureblob')]",
+    "blobManagedIdentityConnectionId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Web/connections/', parameters('blobManagedIdentityConnectionName'))]",
+    "blobAccessKeyConnectionId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Web/connections/', parameters('blobAccessKeyConnectionName'))]",
+    "blobEntraConnectionId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Web/connections/', parameters('blobEntraConnectionName'))]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2016-06-01",
+      "type": "Microsoft.Web/connections",
+      "kind": "V1",
+      "location": "[parameters('location')]",
+      "name": "[parameters('blobManagedIdentityConnectionName')]",
+      "properties": {
+        "displayName": "[parameters('blobManagedIdentityConnectionName')]",
+        "api": {
+          "id": "[variables('blobApiId')]"
+        },
+        "parameterValueSet": {
+          "name": "managedIdentityAuth",
+          "values": {}
+        }
+      }
+    },
+    {
+      "apiVersion": "2016-06-01",
+      "type": "Microsoft.Web/connections",
+      "kind": "V1",
+      "location": "[parameters('location')]",
+      "name": "[parameters('blobAccessKeyConnectionName')]",
+      "properties": {
+        "displayName": "[parameters('blobAccessKeyConnectionName')]",
+        "api": {
+          "id": "[variables('blobApiId')]"
+        },
+        "parameterValues": {
+          "accountName": "[parameters('storageAccountName')]",
+          "accessKey": "[listKeys(concat('Microsoft.Storage/storageAccounts/', parameters('storageAccountName')), '2024-01-01').keys[0].value]"
+        }
+      }
+    },
+    {
+      "apiVersion": "2016-06-01",
+      "type": "Microsoft.Web/connections",
+      "kind": "V1",
+      "location": "[parameters('location')]",
+      "name": "[parameters('blobEntraConnectionName')]",
+      "properties": {
+        "displayName": "[parameters('blobEntraConnectionName')]",
+        "api": {
+          "id": "[variables('blobApiId')]"
+        },
+        "parameterValueSet": {
+          "name": "tokenBasedAuth",
+          "values": {
+            "accountName": "[parameters('storageAccountName')]"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2017-07-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Web/connections/', parameters('blobManagedIdentityConnectionName'))]",
+        "[concat('Microsoft.Web/connections/', parameters('blobAccessKeyConnectionName'))]"
+      ],
+      "properties": {
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            }
+          },
+          "triggers": {
+            "When_a_HTTP_request_is_received": {
+              "type": "Request",
+              "kind": "Http",
+              "inputs": {
+                "method": "POST"
+              }
+            }
+          },
+          "actions": {
+            "Lists_blobs_(V2)_-_Managed_Identity": {
+              "runAfter": {},
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "[concat('@parameters(''$connections'')[''', parameters('blobManagedIdentityConnectionName'), '''][''connectionId'']')]"
+                  }
+                },
+                "method": "get",
+                "path": "[concat('/v2/datasets/@{encodeURIComponent(encodeURIComponent(''', parameters('storageAccountName'), '''))}/foldersV2/@{encodeURIComponent(encodeURIComponent(''', parameters('containerName'), '''))}')]",
+                "queries": {
+                  "useFlatListing": false
+                }
+              }
+            },
+            "Lists_blobs_(V2)_-_Access_Key": {
+              "runAfter": {
+                "Lists_blobs_(V2)_-_Managed_Identity": ["Succeeded"]
+              },
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "[concat('@parameters(''$connections'')[''', parameters('blobAccessKeyConnectionName'), '''][''connectionId'']')]"
+                  }
+                },
+                "method": "get",
+                "path": "[concat('/v2/datasets/@{encodeURIComponent(encodeURIComponent(''', parameters('storageAccountName'), '''))}/foldersV2/@{encodeURIComponent(encodeURIComponent(''', parameters('containerName'), '''))}')]",
+                "queries": {
+                  "useFlatListing": false
+                }
+              }
+            },
+            "Lists_blobs_(V2)_-_Entra": {
+              "runAfter": {
+                "Lists_blobs_(V2)_-_Access_Key": ["Succeeded"]
+              },
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "[concat('@parameters(''$connections'')[''', parameters('blobEntraConnectionName'), '''][''connectionId'']')]"
+                  }
+                },
+                "method": "get",
+                "path": "[concat('/v2/datasets/@{encodeURIComponent(encodeURIComponent(''', parameters('storageAccountName'), '''))}/foldersV2/@{encodeURIComponent(encodeURIComponent(''', parameters('containerName'), '''))}')]",
+                "queries": {
+                  "useFlatListing": false
+                }
+              }
+            }
+          },
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "type": "Object",
+            "value": {
+              "[parameters('blobManagedIdentityConnectionName')]": {
+                "id": "[variables('blobApiId')]",
+                "connectionId": "[variables('blobManagedIdentityConnectionId')]",
+                "connectionName": "[parameters('blobManagedIdentityConnectionName')]",
+                "connectionProperties": {
+                  "authentication": {
+                    "type": "ManagedServiceIdentity"
+                  }
+                }
+              },
+              "[parameters('blobAccessKeyConnectionName')]": {
+                "id": "[variables('blobApiId')]",
+                "connectionId": "[variables('blobAccessKeyConnectionId')]",
+                "connectionName": "[parameters('blobAccessKeyConnectionName')]"
+              },
+              "[parameters('blobEntraConnectionName')]": {
+                "id": "[variables('blobApiId')]",
+                "connectionId": "[variables('blobEntraConnectionId')]",
+                "connectionName": "[parameters('blobEntraConnectionName')]"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "logicAppTriggerUrl": {
+      "type": "string",
+      "value": "[listCallbackUrl(resourceId('Microsoft.Logic/workflows/triggers', parameters('logicAppName'), 'When_a_HTTP_request_is_received'),'2017-07-01').value]"
+    },
+    "tenantId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Logic/workflows', parameters('logicAppName')),'2019-05-01', 'full').identity.tenantId]"
+    },
+    "logicAppManagedIdentityPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Logic/workflows', parameters('logicAppName')),'2019-05-01', 'full').identity.principalId]"
+    }
+  }
+}
