@@ -1,0 +1,80 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "List_all_containers_-_connection_string": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "serviceProviderConfiguration": {
+            "connectionName": "AzureBlob",
+            "operationId": "listContainers",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {}
+      },
+      "List_all_containers_-_managed_identity": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "serviceProviderConfiguration": {
+            "connectionName": "AzureBlob-1",
+            "operationId": "listContainers",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {
+          "List_all_containers_-_connection_string": ["SUCCEEDED"]
+        }
+      },
+      "Lists_blobs_in_the_root_folder_(V2)_-_connection_string": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "referenceName": "azureblob-1"
+            }
+          },
+          "method": "get",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/foldersV2",
+          "queries": {
+            "nextPageMarker": "",
+            "useFlatListing": false
+          }
+        },
+        "runAfter": {
+          "List_all_containers_-_managed_identity": ["SUCCEEDED"]
+        }
+      },
+      "Lists_blobs_in_the_root_folder_(V2)_-_managed_identity": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "referenceName": "azureblob"
+            }
+          },
+          "method": "get",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('briancollettargetsa'))}/foldersV2",
+          "queries": {
+            "nextPageMarker": "",
+            "useFlatListing": false
+          }
+        },
+        "runAfter": {
+          "Lists_blobs_in_the_root_folder_(V2)_-_connection_string": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "When_a_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http"
+      }
+    }
+  },
+  "kind": "Stateful"
+}
