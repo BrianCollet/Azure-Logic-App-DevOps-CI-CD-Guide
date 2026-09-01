@@ -16,23 +16,29 @@ I recommend starting with the [Basic-Demo in Standard](./Standard/Basic-Demo/REA
 ## Repository Structure
 
 ```
-📁 Standard/ # Contains examples for Azure Logic Apps (Standard)
-├── 📁 Basic-Demo/ # Basic example for Standard Logic Apps
-│   └── 📄 README.md # Documentation for the Basic-Demo
-├── 📁 Private-Storage/ # Example using private storage with Standard Logic Apps
-│   └── 📄 README.md # Documentation for the Private-Storage example
+Standard/                         # Azure Logic Apps Standard scenarios
+├── Basic-Demo/
+│   ├── ARM/                       # ARM templates, parameters, and pipeline
+│   ├── logicapp/                  # Shared Logic App source
+│   └── README.md
+└── Private-Storage/               # Standard Logic App with private storage
+    ├── Terraform/                 # Terraform IaC implementation
+    ├── ARM/                       # Future ARM templates and pipeline
+    └── README.md
 
-📁 Consumption/ # Contains examples for Azure Logic Apps (Consumption)
-├── 📁 Basic-Demo/ # Basic example for Consumption Logic Apps
-│   └── 📄 README.md # Documentation for the Basic-Demo
+Consumption/                      # Azure Logic Apps Consumption scenarios
+└── Basic-Demo/
+	├── ARM/                       # ARM templates, parameters, and pipeline
+	└── README.md
 ```
 
 ## Key Features
 
 - **Standard and Consumption Models**: Examples for both Logic App deployment models.
-- **Infrastructure as Code (IaC)**: ARM templates for deploying Logic Apps, storage accounts, and RBAC roles.
+- **Infrastructure as Code (IaC)**: ARM templates and Terraform implementations for flexible deployment options.
 - **CI/CD Pipelines**: Azure DevOps pipelines for automating deployments.
 - **Environment-Specific Configurations**: Parameter files for development, staging, and production environments.
+- **Private Storage Support**: Terraform implementation for Standard Logic Apps with private endpoints and secure networking.
 
 ## Resources Deployed
 
