@@ -7,7 +7,6 @@ This scenario demonstrates a Standard Logic App deployed with private storage, i
 ### Terraform
 A complete Terraform implementation is provided for deploying a Standard Logic App with private storage infrastructure. This includes:
 - Storage account configuration with private endpoints
-- Standard Logic App deployment with managed identity authentication
 - Networking setup for private connectivity
 - Variable definitions for environment-specific deployments
 
