@@ -5,8 +5,8 @@ This repository demonstrates a CI/CD pipeline for deploying an Azure Logic App (
 ## Getting Started
 
 1. **Set Up Azure DevOps**: Configure your Azure DevOps project and service connections.
-2. **Define Variables**: Update environment-specific variables in the `pipelines/variables` folder.
-3. **Run the Pipeline**: Trigger the `deploy.yml` pipeline to provision resources and deploy the Logic App.
+2. **Define Variables**: Update environment-specific variables in the `ARM/pipelines/variables` folder.
+3. **Run the Pipeline**: Trigger `ARM/pipelines/deploy.yml` to provision resources and deploy the Logic App.
 
 ## Resources Deployed
 
@@ -20,8 +20,7 @@ This repository demonstrates a CI/CD pipeline for deploying an Azure Logic App (
 ## Project Structure
 
 ```
-📁 Workspace/ # Main workspace directory for the project
-├── 📁 deployment/ # Contains IaC templates, pipeline definitions, and workflow parameters
+├── 📁 ARM/ # ARM implementation assets
 │   ├── 📁 infrastructure/ # ARM templates and parameter files for Azure resources
 │   │   ├── 📄 azureblob-1.parameters.json # Parameters for Azure Blob Storage (Key-based Auth)
 │   │   ├── 📄 azureblob-1.template.json # Template for Azure Blob Storage (Key-based Auth)
@@ -33,7 +32,7 @@ This repository demonstrates a CI/CD pipeline for deploying an Azure Logic App (
 │   │   ├── 📄 rbac.template.json # Template for RBAC role assignments
 │   │   ├── 📄 storageaccount.parameters.json # Parameters for Storage Account
 │   │   └── 📄 storageaccount.template.json # Template for Storage Account
-│   ├── 📁 pipelines/ # Azure DevOps pipeline definitions
+│   ├── 📁 pipelines/ # Azure DevOps pipeline definitions for ARM
 │   │   ├── 📄 deploy.yml # CI/CD pipeline for deploying Logic App
 │   │   └── 📁 variables/ # Environment-specific variable files
 │   │       ├── 📄 dev-variables.yml # Variables for the development environment
@@ -41,7 +40,11 @@ This repository demonstrates a CI/CD pipeline for deploying an Azure Logic App (
 │   │       └── 📄 prod-variables.yml # Variables for the production environment
 │   └── 📁 workflowparameters/ # Parameters for Logic App workflows
 │       └── 📄 parameters.json # Workflow parameters
-├── 📁 logicapp/ # Logic App-specific files and configurations
+├── 📁 logicapp/ # Shared Logic App-specific files and configurations
 │   ├── 📁 Stateful1/ # Example Logic App workflow
 │   │   └── 📄 workflow.json # Workflow definition for Stateful1
+├── 📁 Bicep/ # Reserved for a future Bicep implementation
+└── 📁 Terraform/ # Reserved for a future Terraform implementation
 ```
+
+`Bicep/` and `Terraform/` are documented conventions and are not yet present in the repository.
